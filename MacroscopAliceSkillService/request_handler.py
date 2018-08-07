@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 
 from MacroscopAliceSkillService.user import User
+import urllib.request
+from xml.dom import minidom
 
 
 class Singleton(type):
@@ -43,11 +45,12 @@ def get_response_pattern(request):
 def create_new_user_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Здравствуйте! Я могу запустить для Вас демо сервер или рассказать о Macroscop'
+        'text'] = 'Здравствуйте! Я могу запустить для Вас демо сервер или рассказать о Камераскоп'
 
     suggests_buttons = [
-        {'title': 'Demo', 'url': 'http://demo.macroscop.com', 'hide': False},
-        {'title': 'Что такое Macroscop?', 'url': 'http://macroscop.com', 'hide': False}
+        {'title': 'Demo сервер', 'hide': False},
+        {'title': 'Зайти на свой сервер', 'hide': False},
+        {'title': 'Что такое Камераскоп?', 'hide': False}
         # {'title': 'Показать кадр с камеры', 'hide': True}
     ]
     response['response']['buttons'] = suggests_buttons
@@ -58,11 +61,11 @@ def create_new_user_response(request):
 def create_default_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Я не поняла Вашу команду. Вот что я умею:'
+        'text'] = 'Вот что я умею:'
 
     suggests_buttons = [
-        {'title': 'Demo', 'url': 'http://demo.macroscop.com', 'hide': False},
-        {'title': 'Что такое Macroscop?', 'url': 'http://macroscop.com', 'hide': False}
+        {'title': 'Demo server', 'hide': False},
+        {'title': 'Что такое Camerascop?', 'hide': False}
         # {'title': 'Показать кадр с камеры', 'hide': True}
     ]
     response['response']['buttons'] = suggests_buttons
@@ -81,11 +84,8 @@ def create_best_soft_response(request):
 def create_about_mc_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Макроскоп - программное обеспечение для систем видеонаблюдения, интеллектуальные модули и \n' \
-                  'сетевые видеорегистраторы. С Макроскоп возможно построить систему от 1 до бесконечного числа \n' \
-                  'любых ай пи камер. Программный комплекс легок в проектировании, внедрении, настройке и обслуживании. \n' \
-                  'Приобретая софт для камер макроскоп, вы получаете возможность использования мобильных клиентов \n' \
-                  'для ОС iOS, Android и WinPhone бесплатно. '
+        'text'] = 'Камераскоп - помогает просматривать видео в формате mjpeg с вашего сервера Macroscop, \n' \
+                  'а также получать информацию по камерам на нём.'
 
     return response
 
@@ -101,6 +101,25 @@ def create_joke_response(request):
     return response
 
 
+def create_demo_response(request):
+    output = urllib.request.urlopen("http://demo.macroscop.com/configex?login=root&password=").read()
+    response = output.decode('utf-8')
+    xml_doc = minidom.parseString(response)
+    channels = xml_doc.getElementsByTagName('ChannelInfo')
+
+    response = get_response_pattern(request)
+    response['response'][
+        'text'] = 'Вот список камер:'
+    suggests_buttons = []
+
+    for channel in channels:
+        channel_id = channel.attributes['Id'].value
+        suggests_buttons.append({'title': channel.attributes['Name'].value, 'url': f'http://demo.macroscop.com/mobile?channelId={channel_id}&resolutionX=1024&resolutionY=662&fps=15&login=root&password=&is_ajax=true&whoami=webclient&withcontenttype=true', 'hide': False})
+
+    response['response']['buttons'] = suggests_buttons
+
+    return response
+
 def handle_request(request):
     """Handle dialog and returns response"""
 
@@ -110,11 +129,15 @@ def handle_request(request):
         user.is_new = False
         return create_new_user_response(request)
 
+    demo_words_pattern = ['демо', 'дэмо', 'demo']
+    if any(word in user.original_utterance.lower() for word in demo_words_pattern):
+        return create_demo_response(request)
+
     best_soft_words_pattern = ['самое лучшее', 'почему']
     if any(word in user.original_utterance.lower() for word in best_soft_words_pattern):
         return create_best_soft_response(request)
 
-    about_mc_words_pattern = ['macroscop', 'макроскоп', 'рассказывай', 'давай', 'трави']
+    about_mc_words_pattern = ['camerascop', 'камераскоп', 'рассказывай', 'давай', 'трави']
     if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
         return create_about_mc_response(request)
 
