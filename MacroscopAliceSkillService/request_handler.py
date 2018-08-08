@@ -31,6 +31,13 @@ class UsersStorage(metaclass=Singleton):
             return new_user
 
 
+suggests_buttons = [
+    {'title': 'Demo сервер', 'hide': False},
+    {'title': 'Зайти на свой сервер', 'hide': False},
+    {'title': 'Что такое Камераскоп?', 'hide': False}
+]
+
+
 def get_response_pattern(request):
     response_pattern = {
         "version": request['version'],
@@ -45,14 +52,10 @@ def get_response_pattern(request):
 def create_new_user_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Здравствуйте! Я могу запустить для Вас демо сервер или рассказать о Камераскоп'
+        'text'] = 'Здравствуйте! Я могу запустить ' \
+                  'для Вас демо сервер или рассказать ' \
+                  'о Камераскоп'
 
-    suggests_buttons = [
-        {'title': 'Demo сервер', 'hide': False},
-        {'title': 'Зайти на свой сервер', 'hide': False},
-        {'title': 'Что такое Камераскоп?', 'hide': False}
-        # {'title': 'Показать кадр с камеры', 'hide': True}
-    ]
     response['response']['buttons'] = suggests_buttons
 
     return response
@@ -62,12 +65,6 @@ def create_default_response(request):
     response = get_response_pattern(request)
     response['response'][
         'text'] = 'Вот что я умею:'
-
-    suggests_buttons = [
-        {'title': 'Demo server', 'hide': False},
-        {'title': 'Что такое Camerascop?', 'hide': False}
-        # {'title': 'Показать кадр с камеры', 'hide': True}
-    ]
     response['response']['buttons'] = suggests_buttons
 
     return response
@@ -81,7 +78,7 @@ def create_best_soft_response(request):
     return response
 
 
-def create_about_mc_response(request):
+def create_about_response(request):
     response = get_response_pattern(request)
     response['response'][
         'text'] = 'Камераскоп - помогает просматривать видео в формате mjpeg с вашего сервера Macroscop, \n' \
@@ -93,8 +90,8 @@ def create_about_mc_response(request):
 def create_joke_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Сергей, Александр и Андрей купили по даче. Сергей не поставил никакой сигнализации, \n' \
-                  'Александр установил простенькую сигнализацию, ну а Андрей навороченную систему видеонаблюдения. \n' \
+        'text'] = 'Сергей, Илья и Андрей купили по даче. Сергей не поставил никакой сигнализации, \n' \
+                  'Илья установил простенькую сигнализацию, ну а Андрей навороченную систему видеонаблюдения. \n' \
                   'Через месяц растащили дачу Сергея, дачу Александра и дачу Андрея тоже, зато он смог всё это \n' \
                   'посмотреть. ха ха ха  '
 
@@ -110,15 +107,46 @@ def create_demo_response(request):
     response = get_response_pattern(request)
     response['response'][
         'text'] = 'Вот список камер:'
-    suggests_buttons = []
+    cameras_buttons = []
 
     for channel in channels:
         channel_id = channel.attributes['Id'].value
-        suggests_buttons.append({'title': channel.attributes['Name'].value, 'url': f'http://demo.macroscop.com/mobile?channelId={channel_id}&resolutionX=1024&resolutionY=662&fps=15&login=root&password=&is_ajax=true&whoami=webclient&withcontenttype=true', 'hide': False})
+        cameras_buttons.append({'title': channel.attributes['Name'].value,
+                                'url': f'http://demo.macroscop.com/mobile?'
+                                       f'channelId={channel_id}&'
+                                       f'resolutionX=1024&'
+                                       f'resolutionY=662&'
+                                       f'fps=15&'
+                                       f'login=root&'
+                                       f'password=&'
+                                       f'is_ajax=true&'
+                                       f'whoami=webclient&'
+                                       f'withcontenttype=true',
+                                'hide': False})
 
+    response['response']['buttons'] = cameras_buttons
+
+    return response
+
+
+def create_enter_server_response(request):
+    response = get_response_pattern(request)
+    response['response'][
+        'text'] = 'Введите адрес сервера, логин и пароль в формате:\n' \
+                  '* (ip адрес или доменное имя):(порт)%(логин)%(пароль)'
+
+    return response
+
+
+def create_login_server_response(request):
+    response = get_response_pattern(request)
+    response['response'][
+        'text'] = 'Мне тяжело Вам об этом говорить, ' \
+                  'но не удалось подлючиться по этим данным... Попробуем ещё разок?'
     response['response']['buttons'] = suggests_buttons
 
     return response
+
 
 def handle_request(request):
     """Handle dialog and returns response"""
@@ -133,13 +161,21 @@ def handle_request(request):
     if any(word in user.original_utterance.lower() for word in demo_words_pattern):
         return create_demo_response(request)
 
+    self_server_words_pattern = ['зайти на свой сервер', 'свой сервер', 'сервер']
+    if any(word in user.original_utterance.lower() for word in self_server_words_pattern):
+        return create_enter_server_response(request)
+
+    self_server_login_words_pattern = ['%']
+    if any(word in user.original_utterance.lower() for word in self_server_login_words_pattern):
+        return create_login_server_response(request)
+
     best_soft_words_pattern = ['самое лучшее', 'почему']
     if any(word in user.original_utterance.lower() for word in best_soft_words_pattern):
         return create_best_soft_response(request)
 
     about_mc_words_pattern = ['camerascop', 'камераскоп', 'рассказывай', 'давай', 'трави']
     if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
-        return create_about_mc_response(request)
+        return create_about_response(request)
 
     about_mc_words_pattern = ['шутка про видео', 'анекдот про видео', 'жги']
     if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
