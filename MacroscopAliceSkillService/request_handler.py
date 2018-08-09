@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
 from MacroscopAliceSkillService.user import User
-import urllib.request
+from urllib.request import urlopen
 from xml.dom import minidom
 
 
@@ -99,7 +99,7 @@ def create_joke_response(request):
 
 
 def create_demo_response(request):
-    output = urllib.request.urlopen("http://demo.macroscop.com/configex?login=root&password=").read()
+    output = urlopen("http://demo.macroscop.com/configex?login=root&password=").read()
     response = output.decode('utf-8')
     xml_doc = minidom.parseString(response)
     channels = xml_doc.getElementsByTagName('ChannelInfo')
@@ -152,7 +152,6 @@ def handle_request(request):
     """Handle dialog and returns response"""
 
     user = UsersStorage().get_user(request)
-
     if user.is_new:
         user.is_new = False
         return create_new_user_response(request)

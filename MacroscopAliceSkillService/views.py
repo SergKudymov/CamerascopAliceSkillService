@@ -1,10 +1,10 @@
 """
-Routes and views for the MacroscopAliceSkillService.
+Routes and views for the CamerascopAliceSkillService.
 """
-import json
 
 from MacroscopAliceSkillService import app
 from flask import request
+from json import dumps
 
 from MacroscopAliceSkillService.request_handler import handle_request
 
@@ -14,4 +14,4 @@ def main():
     """Get request body and return response"""
     response = handle_request(request.get_json())
 
-    return json.dumps(response, ensure_ascii=False, indent=2)
+    return dumps(response, ensure_ascii=False, indent=2)
