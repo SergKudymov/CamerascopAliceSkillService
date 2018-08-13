@@ -4,6 +4,7 @@ class User:
         self.user_id = user_id
         self.original_utterance = original_utterance
         self.is_new = True
+        self.url = None
         self.login = None
         self.password = None
         self.servers = []

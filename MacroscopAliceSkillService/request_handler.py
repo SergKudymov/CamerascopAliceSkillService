@@ -92,7 +92,7 @@ def create_joke_response(request):
     response['response'][
         'text'] = 'Сергей, Илья и Андрей купили по даче. Сергей не поставил никакой сигнализации, \n' \
                   'Илья установил простенькую сигнализацию, ну а Андрей навороченную систему видеонаблюдения. \n' \
-                  'Через месяц растащили дачу Сергея, дачу Александра и дачу Андрея тоже, зато он смог всё это \n' \
+                  'Через месяц растащили дачу Сергея, дачу Ильи и дачу Андрея тоже, зато он смог всё это \n' \
                   'посмотреть. ха ха ха  '
 
     return response
@@ -101,12 +101,17 @@ def create_joke_response(request):
 def create_demo_response(request):
     output = urlopen("http://demo.macroscop.com/configex?login=root&password=").read()
     response = output.decode('utf-8')
-    xml_doc = minidom.parseString(response)
-    channels = xml_doc.getElementsByTagName('ChannelInfo')
+    config_response = parse_config(response, request)
 
+    return config_response
+
+
+def parse_config(config, request):
+    xml_doc = minidom.parseString(config)
+    channels = xml_doc.getElementsByTagName('ChannelInfo')
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Вот список камер:'
+        'text'] = 'Вот список камер на сервере:'
     cameras_buttons = []
 
     for channel in channels:
@@ -133,17 +138,56 @@ def create_enter_server_response(request):
     response = get_response_pattern(request)
     response['response'][
         'text'] = 'Введите адрес сервера, логин и пароль в формате:\n' \
-                  '* (ip адрес или доменное имя):(порт)%(логин)%(пароль)'
+                  '(ip адрес или доменное имя):(порт)%(логин)%(пароль)'
 
     return response
 
 
-def create_login_server_response(request):
+def create_login_server_response(request, user):
+    response = get_response_pattern(request)
+    try:
+        spited_request = user.original_utterance.lower().split('%', 3)
+
+        user.url = spited_request[0]
+        user.login = spited_request[1]
+        user.password = spited_request[2]
+    except IndexError:
+        response['response']['text'] = 'Вы ввели неправильно, вот шаблон:\n' \
+                                       '(ip адрес или доменное имя):(порт)%(логин)%(пароль)'
+        response['response']['buttons'] = suggests_buttons
+        return response
+
+    try:
+        output = urlopen(f"http://{user.url}/configex?login={user.login}&password={user.password}").read()
+        response = output.decode('utf-8')
+    except:
+        response['response']['text'] = 'Ошибка аутентификации'
+        response['response']['buttons'] = suggests_buttons
+        return response
+
+    if 'Configuration' in response:
+        config_response = parse_config(response, request)
+        return config_response
+    else:
+        response['response']['text'] = 'Неверное имя пользователя или пароль.'
+        response['response']['buttons'] = suggests_buttons
+        return response
+
+
+def create_test_response(request):
     response = get_response_pattern(request)
     response['response'][
-        'text'] = 'Мне тяжело Вам об этом говорить, ' \
-                  'но не удалось подлючиться по этим данным... Попробуем ещё разок?'
-    response['response']['buttons'] = suggests_buttons
+        'text'] = 'тест'
+    response['response'][
+        'url'] = 'https://macroscop.com'
+
+    return response
+
+
+def create_error_response(request):
+    response = get_response_pattern(request)
+    response['response'][
+        'text'] = 'Упс, произошла внутренняя ошибка, обратитесь к Сергею!'
 
     return response
 
@@ -151,33 +195,40 @@ def create_login_server_response(request):
 def handle_request(request):
     """Handle dialog and returns response"""
 
-    user = UsersStorage().get_user(request)
-    if user.is_new:
-        user.is_new = False
-        return create_new_user_response(request)
+    try:
+        user = UsersStorage().get_user(request)
+        if user.is_new:
+            user.is_new = False
+            return create_new_user_response(request)
 
-    demo_words_pattern = ['демо', 'дэмо', 'demo']
-    if any(word in user.original_utterance.lower() for word in demo_words_pattern):
-        return create_demo_response(request)
+        self_server_login_words_pattern = ['%']
+        if any(word in user.original_utterance.lower() for word in self_server_login_words_pattern):
+            return create_login_server_response(request, user)
 
-    self_server_words_pattern = ['зайти на свой сервер', 'свой сервер', 'сервер']
-    if any(word in user.original_utterance.lower() for word in self_server_words_pattern):
-        return create_enter_server_response(request)
+        demo_words_pattern = ['демо', 'дэмо', 'demo']
+        if any(word in user.original_utterance.lower() for word in demo_words_pattern):
+            return create_demo_response(request)
 
-    self_server_login_words_pattern = ['%']
-    if any(word in user.original_utterance.lower() for word in self_server_login_words_pattern):
-        return create_login_server_response(request)
+        self_server_words_pattern = ['зайти на свой сервер', 'свой сервер', 'сервер']
+        if any(word in user.original_utterance.lower() for word in self_server_words_pattern):
+            return create_enter_server_response(request)
 
-    best_soft_words_pattern = ['самое лучшее', 'почему']
-    if any(word in user.original_utterance.lower() for word in best_soft_words_pattern):
-        return create_best_soft_response(request)
+        best_soft_words_pattern = ['самое лучшее', 'почему']
+        if any(word in user.original_utterance.lower() for word in best_soft_words_pattern):
+            return create_best_soft_response(request)
 
-    about_mc_words_pattern = ['camerascop', 'камераскоп', 'рассказывай', 'давай', 'трави']
-    if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
-        return create_about_response(request)
+        about_mc_words_pattern = ['camerascop', 'камераскоп', 'рассказывай', 'давай', 'трави']
+        if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
+            return create_about_response(request)
 
-    about_mc_words_pattern = ['шутка про видео', 'анекдот про видео', 'жги']
-    if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
-        return create_joke_response(request)
+        about_mc_words_pattern = ['шутка про видео', 'анекдот про видео', 'жги']
+        if any(word in user.original_utterance.lower() for word in about_mc_words_pattern):
+            return create_joke_response(request)
+
+        test_words_pattern = ['тест', 'тэст', 'test']
+        if any(word in user.original_utterance.lower() for word in test_words_pattern):
+            return create_test_response(request)
+    except:
+        return create_error_response(request)
 
     return create_default_response(request)
